@@ -59,6 +59,13 @@ const App = (() => {
       </div>
     `).join("");
 
+    wrap.querySelectorAll(".record-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const r = records.find((x) => x.id === card.dataset.id);
+        if (r) openEditForm(r);
+      });
+    });
+
     wrap.querySelectorAll(".record-delete").forEach((btn) => {
       btn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
@@ -81,6 +88,33 @@ const App = (() => {
     document.getElementById("ingredients-status").textContent = "";
     document.getElementById("warning-status").textContent = "";
     document.getElementById("warning-preview").style.display = "none";
+    document.querySelector(".form-title").textContent = "お菓子を記録する";
+    Util.showView("view-form");
+  }
+
+  function openEditForm(r) {
+    editingId = r.id;
+    selectedAmount = r.amount || "";
+    currentWarningText = r.warning_text || "";
+    document.getElementById("record-form").reset();
+    document.getElementById("f-name").value = r.name || "";
+    document.getElementById("f-ingredients").value = r.ingredients_text || "";
+
+    document.querySelectorAll("#amount-input span").forEach((s) => {
+      s.classList.toggle("selected", s.dataset.amount === selectedAmount);
+    });
+
+    document.getElementById("btn-delete").style.display = "inline-flex";
+    document.getElementById("ingredients-status").textContent = "";
+    document.getElementById("warning-status").textContent = "";
+    const prev = document.getElementById("warning-preview");
+    if (currentWarningText) {
+      prev.textContent = "⚠️ " + currentWarningText;
+      prev.style.display = "block";
+    } else {
+      prev.style.display = "none";
+    }
+    document.querySelector(".form-title").textContent = "お菓子の記録を編集";
     Util.showView("view-form");
   }
 

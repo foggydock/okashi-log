@@ -1,6 +1,6 @@
 // アプリの外枠（HTML/CSS/JS等の静的ファイル）だけをキャッシュする最小限のService Worker。
 // 記録データ（Supabase）はキャッシュしないため、オフライン時は起動は速くなるが一覧の中身は出ない。
-const CACHE_NAME = "okashi-shell-v3";
+const CACHE_NAME = "okashi-shell-v4";
 const SHELL_FILES = [
   "./",
   "index.html",
