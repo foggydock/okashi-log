@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#241b2f">
+  <title>お菓子ログ</title>
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=1">
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+
+  <header id="app-header" class="app-header" style="display:none">
+    <div class="brand"><span class="brand-icon">🍬</span><span class="brand-name">お菓子ログ</span></div>
+    <div class="header-actions">
+      <button id="btn-new" class="btn btn-primary">＋ 記録する</button>
+      <button id="btn-settings" class="btn btn-ghost" title="Gemini APIキー設定">⚙️</button>
+      <button id="btn-logout" class="btn btn-ghost">ログアウト</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ログイン -->
+    <section id="view-login" class="view active">
+      <div class="login-card">
+        <div class="login-icon">🍬</div>
+        <h1 class="login-title">お菓子ログ</h1>
+        <p class="login-sub">食べた記録をつけて、後悔を減らす。</p>
+        <form id="login-form" class="login-form">
+          <label>メールアドレス
+            <input id="login-email" type="email" autocomplete="username" required>
+          </label>
+          <label>パスワード
+            <input id="login-password" type="password" autocomplete="current-password" required>
+          </label>
+          <button id="btn-login" type="submit" class="btn btn-primary btn-block">ログイン</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 一覧 -->
+    <section id="view-list" class="view">
+      <div class="stop-panel">
+        <button type="button" id="btn-stop" class="btn-stop">🛑 食べたい…踏みとどまる</button>
+        <p class="stop-hint">気持ちが揺れたら押す。過去の記録からランダムに警告を見せます。</p>
+      </div>
+
+      <h2 class="section-title">これまでの記録</h2>
+      <div id="record-list" class="record-list"></div>
+      <div id="list-empty" class="empty" style="display:none">まだ記録がありません。「＋ 記録する」から始めましょう。</div>
+    </section>
+
+    <!-- 追加 -->
+    <section id="view-form" class="view">
+      <form id="record-form" class="record-form" autocomplete="off">
+        <h2 class="form-title">お菓子を記録する</h2>
+
+        <label class="field">お菓子の名前 <span class="req">必須</span>
+          <input id="f-name" type="text" placeholder="例：ポテトチップス うすしお味" required>
+        </label>
+
+        <div class="field">量（大まかでOK）
+          <div id="amount-input" class="amount-input" role="group">
+            <span data-amount="一口">一口</span>
+            <span data-amount="半分">半分</span>
+            <span data-amount="1袋・1個">1袋・1個</span>
+            <span data-amount="2袋・2個以上">2袋・2個以上</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">原材料表示を撮影（自動で読み取ります・写真は保存されません）</label>
+          <div class="fetch-row">
+            <button type="button" id="btn-pick-image" class="btn btn-ghost">📷 撮影／画像を選ぶ</button>
+            <input id="f-image-file" type="file" accept="image/*" capture="environment" style="display:none">
+          </div>
+          <span id="ingredients-status" class="field-hint"></span>
+          <textarea id="f-ingredients" rows="3" placeholder="原材料（自動で入ります。手直しもできます）"></textarea>
+        </div>
+
+        <div class="field">
+          <span id="warning-status" class="field-hint"></span>
+          <div id="warning-preview" class="warning-preview" style="display:none"></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="btn-delete" class="btn btn-danger" style="display:none">削除</button>
+          <div class="spacer"></div>
+          <button type="button" id="btn-cancel" class="btn btn-ghost">キャンセル</button>
+          <button type="submit" id="btn-save" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </section>
+
+  </main>
+
+  <div id="warning-modal" class="modal-overlay" style="display:none">
+    <div class="modal-card warning-modal-card">
+      <div id="warning-modal-name" class="warning-modal-name"></div>
+      <div id="warning-modal-text" class="warning-modal-text"></div>
+      <button type="button" id="warning-modal-close" class="btn btn-primary btn-block">わかった</button>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal-overlay" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">⚙️ Gemini APIキー設定</h2>
+        <button type="button" id="settings-close" class="modal-close" aria-label="閉じる">✕</button>
+      </div>
+      <p class="modal-hint">原材料の読み取り・警告メッセージ生成に使います。このスマホ/ブラウザ内だけに保存されます。</p>
+      <input id="settings-key-input" type="text" placeholder="Gemini APIキーを貼り付け">
+      <div class="paste-btn-row" style="margin-top:10px">
+        <button type="button" id="settings-save" class="btn btn-primary btn-sm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=1"></script>
+  <script src="js/util.js?v=1"></script>
+  <script src="js/db.js?v=1"></script>
+  <script src="js/auth.js?v=1"></script>
+  <script src="js/gemini.js?v=1"></script>
+  <script src="js/app.js?v=1"></script>
+  <script src="js/main.js?v=1"></script>
+</body>
+</html>

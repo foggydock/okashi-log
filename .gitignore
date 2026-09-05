@@ -1,0 +1,8 @@
+# 注：js/config.js は publishable key（公開しても安全）+ URL のみ。
+# デプロイに必要なのでコミットする。秘密の secret key は絶対にここに入れないこと。
+# （他アプリと同じ運用：非公開リポなのでコミットOK）
+
+# OS / ローカル開発用
+.DS_Store
+*.swp
+.claude/
