@@ -1,6 +1,6 @@
 // アプリの外枠（HTML/CSS/JS等の静的ファイル）だけをキャッシュする最小限のService Worker。
 // 記録データ（Supabase）はキャッシュしないため、オフライン時は起動は速くなるが一覧の中身は出ない。
-const CACHE_NAME = "okashi-shell-v2";
+const CACHE_NAME = "okashi-shell-v3";
 const SHELL_FILES = [
   "./",
   "index.html",
@@ -40,8 +40,9 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return; // 別オリジン（Supabase/Gemini等）は素通し
 
   if (req.mode === "navigate") {
+    // GitHub PagesはCache-Control: max-age=600を返すため、no-storeでブラウザの標準HTTPキャッシュを迂回する
     e.respondWith(
-      fetch(req).catch(() => caches.match("index.html"))
+      fetch(req, { cache: "no-store" }).catch(() => caches.match("index.html"))
     );
     return;
   }
@@ -49,7 +50,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
-      return fetch(req).then((res) => {
+      return fetch(req, { cache: "no-store" }).then((res) => {
         if (res.ok) caches.open(CACHE_NAME).then((cache) => cache.put(req, res.clone()));
         return res;
       }).catch(() => caches.match(req, { ignoreSearch: true }));
