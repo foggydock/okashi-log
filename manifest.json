@@ -1,0 +1,13 @@
+{
+  "name": "お菓子ログ",
+  "short_name": "お菓子ログ",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1f1522",
+  "theme_color": "#16101a",
+  "icons": [
+    { "src": "icons/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "icons/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "icons/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" }
+  ]
+}
