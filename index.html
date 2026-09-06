@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#241b2f">
   <title>お菓子ログ</title>
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=4">
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=4">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=5">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=5">
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -19,6 +19,7 @@
     <div class="brand"><span class="brand-icon">🍬</span><span class="brand-name">お菓子ログ</span></div>
     <div class="header-actions">
       <button id="btn-new" class="btn btn-primary">＋ 記録する</button>
+      <button id="btn-calendar" class="btn btn-ghost" title="カレンダーで振り返る">📅</button>
       <button id="btn-settings" class="btn btn-ghost" title="Gemini APIキー設定">⚙️</button>
       <button id="btn-logout" class="btn btn-ghost">ログアウト</button>
     </div>
@@ -54,6 +55,27 @@
       <h2 class="section-title">これまでの記録</h2>
       <div id="record-list" class="record-list"></div>
       <div id="list-empty" class="empty" style="display:none">まだ記録がありません。「＋ 記録する」から始めましょう。</div>
+    </section>
+
+    <!-- カレンダー -->
+    <section id="view-calendar" class="view">
+      <div class="calendar-header">
+        <button type="button" id="cal-prev" class="btn btn-ghost btn-sm">＜</button>
+        <h2 id="cal-title" class="section-title cal-title"></h2>
+        <button type="button" id="cal-next" class="btn btn-ghost btn-sm">＞</button>
+      </div>
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div id="cal-grid" class="calendar-grid"></div>
+
+      <h2 class="section-title cal-day-title" id="cal-day-title" style="display:none"></h2>
+      <div id="cal-day-list" class="record-list"></div>
+
+      <div class="form-actions">
+        <div class="spacer"></div>
+        <button type="button" id="btn-cal-close" class="btn btn-ghost">一覧に戻る</button>
+      </div>
     </section>
 
     <!-- 追加 -->
@@ -123,12 +145,12 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.js"></script>
-  <script src="js/config.js?v=4"></script>
-  <script src="js/util.js?v=4"></script>
-  <script src="js/db.js?v=4"></script>
-  <script src="js/auth.js?v=4"></script>
-  <script src="js/gemini.js?v=4"></script>
-  <script src="js/app.js?v=4"></script>
-  <script src="js/main.js?v=4"></script>
+  <script src="js/config.js?v=5"></script>
+  <script src="js/util.js?v=5"></script>
+  <script src="js/db.js?v=5"></script>
+  <script src="js/auth.js?v=5"></script>
+  <script src="js/gemini.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
+  <script src="js/main.js?v=5"></script>
 </body>
 </html>

@@ -4,10 +4,16 @@ const App = (() => {
   let editingId = null;
   let selectedAmount = "";
   let currentWarningText = "";
+  let calDate = new Date();
+  let calSelectedKey = null;
 
   function init() {
     document.getElementById("btn-new").addEventListener("click", openAddForm);
     document.getElementById("btn-cancel").addEventListener("click", () => Util.showView("view-list"));
+    document.getElementById("btn-calendar").addEventListener("click", openCalendar);
+    document.getElementById("btn-cal-close").addEventListener("click", () => Util.showView("view-list"));
+    document.getElementById("cal-prev").addEventListener("click", () => shiftCalMonth(-1));
+    document.getElementById("cal-next").addEventListener("click", () => shiftCalMonth(1));
     document.getElementById("btn-logout").addEventListener("click", async () => { await Auth.signOut(); location.reload(); });
     document.getElementById("record-form").addEventListener("submit", onSave);
     document.getElementById("btn-delete").addEventListener("click", onDelete);
@@ -74,6 +80,96 @@ const App = (() => {
         const { error } = await DB.deleteRecord(id);
         if (error) { Util.showBanner("削除に失敗：" + error.message, "error"); return; }
         await load();
+      });
+    });
+  }
+
+  function dateKey(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  function openCalendar() {
+    calDate = new Date();
+    calSelectedKey = null;
+    document.getElementById("cal-day-title").style.display = "none";
+    document.getElementById("cal-day-list").innerHTML = "";
+    renderCalendar();
+    Util.showView("view-calendar");
+  }
+
+  function shiftCalMonth(delta) {
+    calDate = new Date(calDate.getFullYear(), calDate.getMonth() + delta, 1);
+    calSelectedKey = null;
+    document.getElementById("cal-day-title").style.display = "none";
+    document.getElementById("cal-day-list").innerHTML = "";
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const year = calDate.getFullYear();
+    const month = calDate.getMonth();
+    document.getElementById("cal-title").textContent = `${year}年${month + 1}月`;
+
+    const byDay = {};
+    records.forEach((r) => {
+      const k = dateKey(r.eaten_at);
+      if (!k) return;
+      (byDay[k] = byDay[k] || []).push(r);
+    });
+
+    const firstOfMonth = new Date(year, month, 1);
+    const startOffset = firstOfMonth.getDay(); // 0=日
+    const gridStart = new Date(year, month, 1 - startOffset);
+    const daysInGrid = 42; // 6週固定
+    const todayKey = dateKey(new Date().toISOString());
+
+    const grid = document.getElementById("cal-grid");
+    grid.innerHTML = "";
+    for (let i = 0; i < daysInGrid; i++) {
+      const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+      const k = dateKey(d.toISOString());
+      const inMonth = d.getMonth() === month;
+      const dayRecords = byDay[k] || [];
+
+      const cell = document.createElement("div");
+      cell.className = "cal-day" + (inMonth ? "" : " other-month") + (k === todayKey ? " today" : "") + (k === calSelectedKey ? " selected" : "");
+      cell.innerHTML = `<span class="cal-day-num">${d.getDate()}</span>` +
+        (dayRecords.length ? `<span class="cal-day-dots">${dayRecords.slice(0, 4).map(() => "<span></span>").join("")}</span>` : "");
+      cell.addEventListener("click", () => selectCalDay(k));
+      grid.appendChild(cell);
+    }
+  }
+
+  function selectCalDay(key) {
+    calSelectedKey = key;
+    renderCalendar();
+    const dayRecords = records.filter((r) => dateKey(r.eaten_at) === key);
+    const title = document.getElementById("cal-day-title");
+    const list = document.getElementById("cal-day-list");
+    const [y, m, d] = key.split("-");
+    title.textContent = `${y}年${Number(m)}月${Number(d)}日の記録`;
+    title.style.display = "block";
+
+    if (dayRecords.length === 0) {
+      list.innerHTML = `<div class="empty">この日の記録はありません。</div>`;
+      return;
+    }
+    list.innerHTML = dayRecords.map((r) => `
+      <div class="record-card" data-id="${r.id}">
+        <div class="record-main">
+          <div class="record-name">${Util.esc(r.name)}</div>
+          <div class="record-meta">${Util.esc(r.amount || "")} ・ ${Util.fmtDateTime(r.eaten_at)}</div>
+          ${r.warning_text ? `<div class="record-warning">⚠️ ${Util.esc(r.warning_text)}</div>` : ""}
+        </div>
+      </div>
+    `).join("");
+    list.querySelectorAll(".record-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const r = records.find((x) => x.id === card.dataset.id);
+        if (r) openEditForm(r);
       });
     });
   }
