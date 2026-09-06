@@ -85,8 +85,8 @@ const App = (() => {
     document.getElementById("record-form").reset();
     document.querySelectorAll("#amount-input span").forEach((s) => s.classList.remove("selected"));
     document.getElementById("btn-delete").style.display = "none";
-    document.getElementById("ingredients-status").textContent = "";
-    document.getElementById("warning-status").textContent = "";
+    setStatus(document.getElementById("ingredients-status"), "", null);
+    setStatus(document.getElementById("warning-status"), "", null);
     document.getElementById("warning-preview").style.display = "none";
     document.querySelector(".form-title").textContent = "お菓子を記録する";
     Util.showView("view-form");
@@ -105,8 +105,8 @@ const App = (() => {
     });
 
     document.getElementById("btn-delete").style.display = "inline-flex";
-    document.getElementById("ingredients-status").textContent = "";
-    document.getElementById("warning-status").textContent = "";
+    setStatus(document.getElementById("ingredients-status"), "", null);
+    setStatus(document.getElementById("warning-status"), "", null);
     const prev = document.getElementById("warning-preview");
     if (currentWarningText) {
       prev.textContent = "⚠️ " + currentWarningText;
@@ -124,29 +124,35 @@ const App = (() => {
     if (!file) return;
 
     const status = document.getElementById("ingredients-status");
-    status.textContent = "原材料を読み取り中…（10秒ほどかかります）";
+    setStatus(status, "原材料を読み取り中…（10秒ほどかかります）", "pending");
     let ingredientsText;
     try {
       ingredientsText = await Gemini.extractIngredients(file);
     } catch (e) {
-      status.textContent = "失敗：" + e.message;
+      setStatus(status, "❌ 失敗：" + e.message, "err");
       return;
     }
     document.getElementById("f-ingredients").value = ingredientsText;
-    status.textContent = "読み取り完了。内容を確認・修正できます。";
+    setStatus(status, "✅ 読み取り完了。内容を確認・修正できます。", "ok");
 
     const name = document.getElementById("f-name").value.trim() || "このお菓子";
     const warnStatus = document.getElementById("warning-status");
-    warnStatus.textContent = "警告メッセージを作成中…";
+    setStatus(warnStatus, "警告メッセージを作成中…", "pending");
     try {
       currentWarningText = await Gemini.generateWarning(name, ingredientsText);
       const prev = document.getElementById("warning-preview");
       prev.textContent = "⚠️ " + currentWarningText;
       prev.style.display = "block";
-      warnStatus.textContent = "";
+      setStatus(warnStatus, "✅ 警告メッセージを作成しました", "ok");
     } catch (e) {
-      warnStatus.textContent = "警告メッセージの生成に失敗：" + e.message;
+      setStatus(warnStatus, "❌ 警告メッセージの生成に失敗：" + e.message, "err");
     }
+  }
+
+  function setStatus(el, text, kind) {
+    el.textContent = text;
+    el.classList.remove("field-hint-ok", "field-hint-err", "field-hint-pending");
+    if (kind) el.classList.add(`field-hint-${kind}`);
   }
 
   async function onSave(ev) {

@@ -50,9 +50,13 @@ const Gemini = (() => {
     const prompt = `この画像はお菓子・食品パッケージの「原材料名」表示欄です。
 書かれている原材料・添加物をそのまま、読み取れる順番でカンマ区切りのテキストとして書き出してください。
 説明や前置きは不要、原材料名の羅列だけを返してください。読み取れない場合は「読み取れませんでした」とだけ返してください。`;
-    return await callText(prompt, {
+    const text = await callText(prompt, {
       inline_data: { mime_type: file.type || "image/jpeg", data: b64 },
     });
+    if (text.includes("読み取れませんでした")) {
+      throw new Error("原材料表示を読み取れませんでした。写真を撮り直してください");
+    }
+    return text;
   }
 
   // 原材料テキスト → 強めのトーンの警告メッセージを生成

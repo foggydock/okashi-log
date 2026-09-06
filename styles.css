@@ -120,6 +120,9 @@ body {
   border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
 }
 .field-hint { color: var(--muted); font-size: .8rem; }
+.field-hint-pending { color: var(--muted); }
+.field-hint-ok { color: #4caf50; font-weight: 600; }
+.field-hint-err { color: var(--danger); font-weight: 600; }
 
 .amount-input { display: flex; flex-wrap: wrap; gap: 8px; }
 .amount-input span {
