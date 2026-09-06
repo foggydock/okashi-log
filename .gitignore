@@ -6,3 +6,7 @@
 .DS_Store
 *.swp
 .claude/
+
+# iCloud写真読み取り自動化のログ・下書き出力
+scripts/*.log
+scripts/ingest-draft-*.md
