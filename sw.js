@@ -1,6 +1,8 @@
 // アプリの外枠（HTML/CSS/JS等の静的ファイル）だけをキャッシュする最小限のService Worker。
 // 記録データ（Supabase）はキャッシュしないため、オフライン時は起動は速くなるが一覧の中身は出ない。
 const CACHE_NAME = "okashi-shell-v5";
+// 同じドメイン（foggydock.github.io）の他のアプリとキャッシュの置き場が共通なので、消すのはこの接頭辞の古い版だけにする
+const CACHE_PREFIX = "okashi-shell-";
 const SHELL_FILES = [
   "./",
   "index.html",
@@ -30,7 +32,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
