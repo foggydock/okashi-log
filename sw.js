@@ -1,11 +1,11 @@
 // アプリの外枠（HTML/CSS/JS等の静的ファイル）だけをキャッシュする最小限のService Worker。
 // 記録データ（Supabase）はキャッシュしないため、オフライン時は起動は速くなるが一覧の中身は出ない。
-const CACHE_NAME = "okashi-shell-v5";
+const CACHE_NAME = "okashi-shell-v6";
 // 同じドメイン（foggydock.github.io）の他のアプリとキャッシュの置き場が共通なので、消すのはこの接頭辞の古い版だけにする
 const CACHE_PREFIX = "okashi-shell-";
+// index.html は入れない（Cloudflare Pages では "/" へ転送され、転送済みの応答を画面遷移に返すと開けなくなる）
 const SHELL_FILES = [
   "./",
-  "index.html",
   "styles.css",
   "manifest.json",
   "js/config.js",
@@ -44,7 +44,7 @@ self.addEventListener("fetch", (e) => {
   if (req.mode === "navigate") {
     // GitHub PagesはCache-Control: max-age=600を返すため、no-storeでブラウザの標準HTTPキャッシュを迂回する
     e.respondWith(
-      fetch(req, { cache: "no-store" }).catch(() => caches.match("index.html"))
+      fetch(req, { cache: "no-store" }).catch(() => caches.match("./"))
     );
     return;
   }
@@ -53,7 +53,7 @@ self.addEventListener("fetch", (e) => {
     caches.match(req, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
       return fetch(req, { cache: "no-store" }).then((res) => {
-        if (res.ok) caches.open(CACHE_NAME).then((cache) => cache.put(req, res.clone()));
+        if (res.ok && !res.redirected) caches.open(CACHE_NAME).then((cache) => cache.put(req, res.clone()));
         return res;
       }).catch(() => caches.match(req, { ignoreSearch: true }));
     })
