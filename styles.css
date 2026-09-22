@@ -146,6 +146,25 @@ body {
 .field-hint-ok { color: #4caf50; font-weight: 600; }
 .field-hint-err { color: var(--danger); font-weight: 600; }
 
+.past-snack-suggestions { margin-top: -10px; }
+.past-snack-options { display: flex; gap: 7px; overflow-x: auto; padding: 3px 1px 5px; -webkit-overflow-scrolling: touch; }
+.past-snack-option {
+  flex: 0 0 auto; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
+  padding: 7px 11px; font: inherit; font-size: .84rem; cursor: pointer;
+}
+.past-snack-option:hover, .past-snack-option:active { border-color: var(--accent); color: var(--accent); }
+
+.past-record-preview {
+  background: rgba(255, 255, 255, .05); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; margin-top: -8px;
+}
+.past-record-title { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+.past-record-name { font-weight: 700; }
+.past-record-meta { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+.past-record-ingredients { color: var(--muted); font-size: .82rem; margin-top: 8px; white-space: pre-wrap; }
+.past-record-warning { color: var(--warn-ink); font-size: .85rem; margin-top: 8px; }
+
 .amount-input { display: flex; flex-wrap: wrap; gap: 8px; }
 .amount-input span {
   padding: 8px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line);
