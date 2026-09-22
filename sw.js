@@ -1,6 +1,6 @@
 // アプリの外枠（HTML/CSS/JS等の静的ファイル）だけをキャッシュする最小限のService Worker。
 // 記録データ（Supabase）はキャッシュしないため、オフライン時は起動は速くなるが一覧の中身は出ない。
-const CACHE_NAME = "okashi-shell-v8";
+const CACHE_NAME = "okashi-shell-v9";
 // 同じドメイン（foggydock.github.io）の他のアプリとキャッシュの置き場が共通なので、消すのはこの接頭辞の古い版だけにする
 const CACHE_PREFIX = "okashi-shell-";
 // index.html は入れない（Cloudflare Pages では "/" へ転送され、転送済みの応答を画面遷移に返すと開けなくなる）
