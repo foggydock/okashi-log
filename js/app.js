@@ -16,6 +16,8 @@ const App = (() => {
     document.getElementById("cal-next").addEventListener("click", () => shiftCalMonth(1));
     document.getElementById("btn-logout").addEventListener("click", async () => { await Auth.signOut(); location.reload(); });
     document.getElementById("record-form").addEventListener("submit", onSave);
+    document.getElementById("f-name").addEventListener("input", onSnackNameInput);
+    document.getElementById("f-name").addEventListener("change", onSnackNameInput);
     document.getElementById("btn-delete").addEventListener("click", onDelete);
     document.getElementById("btn-stop").addEventListener("click", () => showRandomWarning(true));
     document.getElementById("warning-modal-close").addEventListener("click", () => {
@@ -42,7 +44,95 @@ const App = (() => {
 
   async function load() {
     records = await DB.listRecords();
+    renderPastSnackChoices();
     render();
+  }
+
+  // 同じ名前の記録をまとめ、直近に使ったお菓子名を入力候補として出す。
+  // DBの記録は既に eaten_at 降順なので、最初に見つかったものが最新記録になる。
+  function normalizeSnackName(name) {
+    return String(name || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("ja-JP");
+  }
+
+  function pastRecordsFor(name) {
+    const key = normalizeSnackName(name);
+    if (!key) return [];
+    return records.filter((r) => r.id !== editingId && normalizeSnackName(r.name) === key);
+  }
+
+  function snackNameChoices(query = "") {
+    const key = normalizeSnackName(query);
+    const seen = new Set();
+    return records.filter((r) => {
+      const nameKey = normalizeSnackName(r.name);
+      if (!nameKey || seen.has(nameKey)) return false;
+      seen.add(nameKey);
+      return !key || nameKey.includes(key);
+    });
+  }
+
+  function renderPastSnackChoices(query = "") {
+    const list = document.getElementById("past-snack-names");
+    const allChoices = snackNameChoices();
+    const choices = snackNameChoices(query);
+    list.innerHTML = "";
+    allChoices.forEach((r) => {
+      const option = document.createElement("option");
+      option.value = r.name;
+      list.appendChild(option);
+    });
+
+    const hint = document.getElementById("past-snack-hint");
+    const suggestions = document.getElementById("past-snack-suggestions");
+    const options = document.getElementById("past-snack-options");
+    options.innerHTML = "";
+    if (!allChoices.length) {
+      suggestions.style.display = "none";
+      return;
+    }
+    hint.textContent = query
+      ? (choices.length ? "該当するお菓子（タップして選ぶ）" : "該当する過去の記録はありません")
+      : "最近記録したお菓子（タップして選ぶ）";
+    choices.slice(0, 10).forEach((r) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "past-snack-option";
+      button.textContent = r.name;
+      button.title = r.name;
+      button.addEventListener("click", () => {
+        document.getElementById("f-name").value = r.name;
+        onSnackNameInput();
+      });
+      options.appendChild(button);
+    });
+    suggestions.style.display = "block";
+  }
+
+  function onSnackNameInput() {
+    renderPastSnackChoices(document.getElementById("f-name").value);
+    updatePastRecordPreview();
+  }
+
+  function updatePastRecordPreview() {
+    const name = document.getElementById("f-name").value;
+    const matches = pastRecordsFor(name);
+    const preview = document.getElementById("past-record-preview");
+    if (!matches.length) {
+      preview.innerHTML = "";
+      preview.style.display = "none";
+      return;
+    }
+
+    const latest = matches[0];
+    const count = matches.length;
+    preview.innerHTML = `
+      <div class="past-record-title">このお菓子の過去の記録${count > 1 ? `（${count}件中の最新）` : ""}</div>
+      <div class="past-record-name">${Util.esc(latest.name)}</div>
+      <div class="past-record-meta">${Util.esc(latest.amount || "量の記録なし")} ・ ${Util.esc(Util.fmtDateTime(latest.eaten_at))}</div>
+      ${latest.ingredients_text ? `<div class="past-record-ingredients">原材料：${Util.nl2br(latest.ingredients_text)}</div>` : ""}
+      ${latest.warning_text ? `<div class="past-record-warning">⚠️ ${Util.esc(latest.warning_text)}</div>` : ""}
+    `;
+    preview.style.display = "block";
   }
 
   function render() {
@@ -184,6 +274,7 @@ const App = (() => {
     setStatus(document.getElementById("ingredients-status"), "", null);
     setStatus(document.getElementById("warning-status"), "", null);
     document.getElementById("warning-preview").style.display = "none";
+    updatePastRecordPreview();
     document.querySelector(".form-title").textContent = "お菓子を記録する";
     Util.showView("view-form");
   }
@@ -211,6 +302,7 @@ const App = (() => {
       prev.style.display = "none";
     }
     document.querySelector(".form-title").textContent = "お菓子の記録を編集";
+    updatePastRecordPreview();
     Util.showView("view-form");
   }
 
