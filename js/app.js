@@ -6,15 +6,21 @@ const App = (() => {
   let currentWarningText = "";
   let calDate = new Date();
   let calSelectedKey = null;
+  let formInitialState = null;
+  let isSaving = false;
 
   function init() {
-    document.getElementById("btn-new").addEventListener("click", openAddForm);
-    document.getElementById("btn-cancel").addEventListener("click", () => Util.showView("view-list"));
-    document.getElementById("btn-calendar").addEventListener("click", openCalendar);
+    document.getElementById("btn-new").addEventListener("click", () => leaveFormIfNeeded(openAddForm));
+    document.getElementById("btn-cancel").addEventListener("click", () => leaveFormIfNeeded(() => Util.showView("view-list")));
+    document.getElementById("btn-calendar").addEventListener("click", () => leaveFormIfNeeded(openCalendar));
     document.getElementById("btn-cal-close").addEventListener("click", () => Util.showView("view-list"));
     document.getElementById("cal-prev").addEventListener("click", () => shiftCalMonth(-1));
     document.getElementById("cal-next").addEventListener("click", () => shiftCalMonth(1));
-    document.getElementById("btn-logout").addEventListener("click", async () => { await Auth.signOut(); location.reload(); });
+    document.getElementById("btn-logout").addEventListener("click", async () => {
+      if (isFormDirty() && !confirm("入力した内容は保存されていません。破棄してログアウトしますか？")) return;
+      await Auth.signOut();
+      location.reload();
+    });
     document.getElementById("record-form").addEventListener("submit", onSave);
     document.getElementById("f-name").addEventListener("input", onSnackNameInput);
     document.getElementById("f-name").addEventListener("change", onSnackNameInput);
@@ -40,6 +46,11 @@ const App = (() => {
     document.getElementById("btn-settings").addEventListener("click", openSettings);
     document.getElementById("settings-close").addEventListener("click", closeSettings);
     document.getElementById("settings-save").addEventListener("click", saveSettings);
+    window.addEventListener("beforeunload", (ev) => {
+      if (!isFormDirty() || isSaving) return;
+      ev.preventDefault();
+      ev.returnValue = "";
+    });
   }
 
   async function load() {
@@ -276,6 +287,7 @@ const App = (() => {
     document.getElementById("warning-preview").style.display = "none";
     updatePastRecordPreview();
     document.querySelector(".form-title").textContent = "お菓子を記録する";
+    rememberFormInitialState();
     Util.showView("view-form");
   }
 
@@ -303,7 +315,31 @@ const App = (() => {
     }
     document.querySelector(".form-title").textContent = "お菓子の記録を編集";
     updatePastRecordPreview();
+    rememberFormInitialState();
     Util.showView("view-form");
+  }
+
+  function currentFormState() {
+    return JSON.stringify({
+      name: document.getElementById("f-name").value.trim(),
+      amount: selectedAmount,
+      ingredients: document.getElementById("f-ingredients").value.trim(),
+      warning: currentWarningText,
+    });
+  }
+
+  function rememberFormInitialState() {
+    formInitialState = currentFormState();
+  }
+
+  function isFormDirty() {
+    return document.getElementById("view-form").classList.contains("active") &&
+      formInitialState !== null && currentFormState() !== formInitialState;
+  }
+
+  function leaveFormIfNeeded(next) {
+    if (isFormDirty() && !confirm("入力した内容は保存されていません。破棄して移動しますか？")) return;
+    next();
   }
 
   async function onImagePicked(ev) {
@@ -357,13 +393,24 @@ const App = (() => {
 
     const btn = document.getElementById("btn-save");
     btn.disabled = true; btn.textContent = "保存中…";
-    const { error } = editingId
-      ? await DB.updateRecord(editingId, row)
-      : await DB.insertRecord(row);
-    btn.disabled = false; btn.textContent = "保存";
+    isSaving = true;
+    let error;
+    try {
+      ({ error } = editingId
+        ? await DB.updateRecord(editingId, row)
+        : await DB.insertRecord(row));
+    } catch (e) {
+      error = e instanceof Error ? e : new Error("通信に失敗しました");
+    } finally {
+      isSaving = false;
+      btn.disabled = false;
+      btn.textContent = "保存";
+    }
 
     if (error) { Util.showBanner("保存に失敗：" + error.message, "error"); return; }
 
+    // 保存に成功した内容を基準にし、保存後の画面切替・再読み込みでは警告を出さない。
+    rememberFormInitialState();
     Util.showView("view-list");
     await load();
   }
