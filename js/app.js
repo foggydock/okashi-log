@@ -1,6 +1,8 @@
 // お菓子ログ本体ロジック
 const App = (() => {
   let records = [];
+  let loadFailed = false;
+  let loadSeq = 0;
   let editingId = null;
   let selectedAmount = "";
   let currentWarningText = "";
@@ -8,9 +10,11 @@ const App = (() => {
   let calSelectedKey = null;
   let formInitialState = null;
   let isSaving = false;
+  // 読み取り中の画像処理。フォームを開き直したら捨てて、遅れて届いた結果を別の記録に入れない
+  let imageJob = null;
 
   function init() {
-    document.getElementById("btn-new").addEventListener("click", () => leaveFormIfNeeded(openAddForm));
+    document.getElementById("btn-new").addEventListener("click", () => leaveFormIfNeeded(openForm));
     document.getElementById("btn-cancel").addEventListener("click", () => leaveFormIfNeeded(() => Util.showView("view-list")));
     document.getElementById("btn-calendar").addEventListener("click", () => leaveFormIfNeeded(openCalendar));
     document.getElementById("btn-cal-close").addEventListener("click", () => Util.showView("view-list"));
@@ -18,12 +22,15 @@ const App = (() => {
     document.getElementById("cal-next").addEventListener("click", () => shiftCalMonth(1));
     document.getElementById("btn-logout").addEventListener("click", async () => {
       if (isFormDirty() && !confirm("入力した内容は保存されていません。破棄してログアウトしますか？")) return;
+      // 破棄を選んだので、ログアウト後の再読み込みで「このサイトを離れますか？」をもう一度出さない
+      formInitialState = null;
       await Auth.signOut();
       location.reload();
     });
     document.getElementById("record-form").addEventListener("submit", onSave);
+    // 候補（datalist）から選んだときも input が起きる。change でも描き直すと、
+    // 候補ボタンを押した瞬間に入力欄のフォーカスが外れてボタンが作り直され、1回目のタップが効かなくなる
     document.getElementById("f-name").addEventListener("input", onSnackNameInput);
-    document.getElementById("f-name").addEventListener("change", onSnackNameInput);
     document.getElementById("btn-delete").addEventListener("click", onDelete);
     document.getElementById("btn-stop").addEventListener("click", () => showRandomWarning(true));
     document.getElementById("warning-modal-close").addEventListener("click", () => {
@@ -54,7 +61,12 @@ const App = (() => {
   }
 
   async function load() {
-    records = await DB.listRecords();
+    const seq = ++loadSeq;
+    const list = await DB.listRecords();
+    if (seq !== loadSeq) return; // 後から始めた読み込みを優先し、古い結果で上書きしない
+    // 読み込みに失敗したら手元の一覧は残す（通信エラーで「まだ記録がありません」と見せない）
+    loadFailed = !list;
+    if (list) records = list;
     renderPastSnackChoices();
     render();
   }
@@ -71,21 +83,21 @@ const App = (() => {
     return records.filter((r) => r.id !== editingId && normalizeSnackName(r.name) === key);
   }
 
-  function snackNameChoices(query = "") {
-    const key = normalizeSnackName(query);
+  function snackNameChoices() {
     const seen = new Set();
     return records.filter((r) => {
       const nameKey = normalizeSnackName(r.name);
       if (!nameKey || seen.has(nameKey)) return false;
       seen.add(nameKey);
-      return !key || nameKey.includes(key);
+      return true;
     });
   }
 
   function renderPastSnackChoices(query = "") {
     const list = document.getElementById("past-snack-names");
     const allChoices = snackNameChoices();
-    const choices = snackNameChoices(query);
+    const key = normalizeSnackName(query);
+    const choices = key ? allChoices.filter((r) => normalizeSnackName(r.name).includes(key)) : allChoices;
     list.innerHTML = "";
     allChoices.forEach((r) => {
       const option = document.createElement("option");
@@ -101,7 +113,7 @@ const App = (() => {
       suggestions.style.display = "none";
       return;
     }
-    hint.textContent = query
+    hint.textContent = key
       ? (choices.length ? "該当するお菓子（タップして選ぶ）" : "該当する過去の記録はありません")
       : "最近記録したお菓子（タップして選ぶ）";
     choices.slice(0, 10).forEach((r) => {
@@ -146,67 +158,70 @@ const App = (() => {
     preview.style.display = "block";
   }
 
+  // 一覧とカレンダーで共通の記録カード。when は「今日」や日時など、量の横に出す文字
+  function recordCardHtml(r, when, withDelete) {
+    const meta = [r.amount, when].filter(Boolean).join(" ・ ");
+    return `
+      <div class="record-card" data-id="${r.id}">
+        <div class="record-main">
+          <div class="record-name">${Util.esc(r.name)}</div>
+          <div class="record-meta">${Util.esc(meta)}</div>
+          ${r.warning_text ? `<div class="record-warning">⚠️ ${Util.esc(r.warning_text)}</div>` : ""}
+        </div>
+        ${withDelete ? `<button type="button" class="btn btn-ghost btn-sm record-delete" data-id="${r.id}">🗑</button>` : ""}
+      </div>
+    `;
+  }
+
+  function bindRecordCards(container) {
+    container.querySelectorAll(".record-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const r = records.find((x) => x.id === card.dataset.id);
+        if (r) openForm(r);
+      });
+    });
+  }
+
   function render() {
     const wrap = document.getElementById("record-list");
     const empty = document.getElementById("list-empty");
     if (records.length === 0) {
       wrap.innerHTML = "";
+      empty.textContent = loadFailed
+        ? "記録を読み込めませんでした。通信状況を確認して、ページを再読み込みしてください。"
+        : "まだ記録がありません。「＋ 記録する」から始めましょう。";
       empty.style.display = "block";
       return;
     }
     empty.style.display = "none";
-    wrap.innerHTML = records.map((r) => `
-      <div class="record-card" data-id="${r.id}">
-        <div class="record-main">
-          <div class="record-name">${Util.esc(r.name)}</div>
-          <div class="record-meta">${Util.esc(r.amount || "")} ・ ${Util.esc(Util.relDay(r.eaten_at))}</div>
-          ${r.warning_text ? `<div class="record-warning">⚠️ ${Util.esc(r.warning_text)}</div>` : ""}
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm record-delete" data-id="${r.id}">🗑</button>
-      </div>
-    `).join("");
-
-    wrap.querySelectorAll(".record-card").forEach((card) => {
-      card.addEventListener("click", () => {
-        const r = records.find((x) => x.id === card.dataset.id);
-        if (r) openEditForm(r);
-      });
-    });
+    wrap.innerHTML = records.map((r) => recordCardHtml(r, Util.relDay(r.eaten_at), true)).join("");
+    bindRecordCards(wrap);
 
     wrap.querySelectorAll(".record-delete").forEach((btn) => {
       btn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
-        const id = btn.dataset.id;
-        if (!confirm("この記録を削除します。よろしいですか？")) return;
-        const { error } = await DB.deleteRecord(id);
-        if (error) { Util.showBanner("削除に失敗：" + error.message, "error"); return; }
-        await load();
+        if (await deleteWithConfirm(btn.dataset.id)) await load();
       });
     });
   }
 
-  function dateKey(iso) {
-    const d = new Date(iso);
-    if (isNaN(d)) return "";
-    const p = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  }
-
   function openCalendar() {
     calDate = new Date();
-    calSelectedKey = null;
-    document.getElementById("cal-day-title").style.display = "none";
-    document.getElementById("cal-day-list").innerHTML = "";
+    clearCalDay();
     renderCalendar();
     Util.showView("view-calendar");
   }
 
   function shiftCalMonth(delta) {
     calDate = new Date(calDate.getFullYear(), calDate.getMonth() + delta, 1);
+    clearCalDay();
+    renderCalendar();
+  }
+
+  function clearCalDay() {
     calSelectedKey = null;
     document.getElementById("cal-day-title").style.display = "none";
     document.getElementById("cal-day-list").innerHTML = "";
-    renderCalendar();
   }
 
   function renderCalendar() {
@@ -216,7 +231,7 @@ const App = (() => {
 
     const byDay = {};
     records.forEach((r) => {
-      const k = dateKey(r.eaten_at);
+      const k = Util.fmtDate(r.eaten_at);
       if (!k) return;
       (byDay[k] = byDay[k] || []).push(r);
     });
@@ -225,13 +240,13 @@ const App = (() => {
     const startOffset = firstOfMonth.getDay(); // 0=日
     const gridStart = new Date(year, month, 1 - startOffset);
     const daysInGrid = 42; // 6週固定
-    const todayKey = dateKey(new Date().toISOString());
+    const todayKey = Util.fmtDate(new Date());
 
     const grid = document.getElementById("cal-grid");
     grid.innerHTML = "";
     for (let i = 0; i < daysInGrid; i++) {
       const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
-      const k = dateKey(d.toISOString());
+      const k = Util.fmtDate(d);
       const inMonth = d.getMonth() === month;
       const dayRecords = byDay[k] || [];
 
@@ -247,7 +262,7 @@ const App = (() => {
   function selectCalDay(key) {
     calSelectedKey = key;
     renderCalendar();
-    const dayRecords = records.filter((r) => dateKey(r.eaten_at) === key);
+    const dayRecords = records.filter((r) => Util.fmtDate(r.eaten_at) === key);
     const title = document.getElementById("cal-day-title");
     const list = document.getElementById("cal-day-list");
     const [y, m, d] = key.split("-");
@@ -258,65 +273,39 @@ const App = (() => {
       list.innerHTML = `<div class="empty">この日の記録はありません。</div>`;
       return;
     }
-    list.innerHTML = dayRecords.map((r) => `
-      <div class="record-card" data-id="${r.id}">
-        <div class="record-main">
-          <div class="record-name">${Util.esc(r.name)}</div>
-          <div class="record-meta">${Util.esc(r.amount || "")} ・ ${Util.fmtDateTime(r.eaten_at)}</div>
-          ${r.warning_text ? `<div class="record-warning">⚠️ ${Util.esc(r.warning_text)}</div>` : ""}
-        </div>
-      </div>
-    `).join("");
-    list.querySelectorAll(".record-card").forEach((card) => {
-      card.addEventListener("click", () => {
-        const r = records.find((x) => x.id === card.dataset.id);
-        if (r) openEditForm(r);
-      });
-    });
+    list.innerHTML = dayRecords.map((r) => recordCardHtml(r, Util.fmtDateTime(r.eaten_at), false)).join("");
+    bindRecordCards(list);
   }
 
-  function openAddForm() {
-    editingId = null;
-    selectedAmount = "";
-    currentWarningText = "";
+  // r を渡すと編集、省略すると新規記録
+  function openForm(r = null) {
+    editingId = r ? r.id : null;
+    selectedAmount = r?.amount || "";
+    currentWarningText = r?.warning_text || "";
+    imageJob = null;
     document.getElementById("record-form").reset();
-    document.querySelectorAll("#amount-input span").forEach((s) => s.classList.remove("selected"));
-    document.getElementById("btn-delete").style.display = "none";
-    setStatus(document.getElementById("ingredients-status"), "", null);
-    setStatus(document.getElementById("warning-status"), "", null);
-    document.getElementById("warning-preview").style.display = "none";
-    updatePastRecordPreview();
-    document.querySelector(".form-title").textContent = "お菓子を記録する";
-    rememberFormInitialState();
-    Util.showView("view-form");
-  }
-
-  function openEditForm(r) {
-    editingId = r.id;
-    selectedAmount = r.amount || "";
-    currentWarningText = r.warning_text || "";
-    document.getElementById("record-form").reset();
-    document.getElementById("f-name").value = r.name || "";
-    document.getElementById("f-ingredients").value = r.ingredients_text || "";
+    document.getElementById("f-name").value = r?.name || "";
+    document.getElementById("f-ingredients").value = r?.ingredients_text || "";
 
     document.querySelectorAll("#amount-input span").forEach((s) => {
       s.classList.toggle("selected", s.dataset.amount === selectedAmount);
     });
 
-    document.getElementById("btn-delete").style.display = "inline-flex";
+    document.getElementById("btn-delete").style.display = r ? "inline-flex" : "none";
     setStatus(document.getElementById("ingredients-status"), "", null);
     setStatus(document.getElementById("warning-status"), "", null);
-    const prev = document.getElementById("warning-preview");
-    if (currentWarningText) {
-      prev.textContent = "⚠️ " + currentWarningText;
-      prev.style.display = "block";
-    } else {
-      prev.style.display = "none";
-    }
-    document.querySelector(".form-title").textContent = "お菓子の記録を編集";
-    updatePastRecordPreview();
+    showWarningPreview(currentWarningText);
+    document.querySelector(".form-title").textContent = r ? "お菓子の記録を編集" : "お菓子を記録する";
+    // 前回入力した名前で絞り込まれた候補が残らないよう、今の名前で描き直す
+    onSnackNameInput();
     rememberFormInitialState();
     Util.showView("view-form");
+  }
+
+  function showWarningPreview(text) {
+    const prev = document.getElementById("warning-preview");
+    prev.textContent = text ? "⚠️ " + text : "";
+    prev.style.display = text ? "block" : "none";
   }
 
   function currentFormState() {
@@ -347,29 +336,45 @@ const App = (() => {
     ev.target.value = "";
     if (!file) return;
 
+    // 読み取り中に別の記録を開いたり、画像を選び直したりしたら、この結果は捨てる
+    const job = {};
+    imageJob = job;
+    try {
+      await readIngredientsAndWarning(file, () => imageJob !== job);
+    } finally {
+      if (imageJob === job) imageJob = null;
+    }
+  }
+
+  async function readIngredientsAndWarning(file, isStale) {
     const status = document.getElementById("ingredients-status");
+    const warnStatus = document.getElementById("warning-status");
     setStatus(status, "原材料を読み取り中…（10秒ほどかかります）", "pending");
+    setStatus(warnStatus, "", null);
     let ingredientsText;
     try {
       ingredientsText = await Gemini.extractIngredients(file);
     } catch (e) {
-      setStatus(status, "❌ 失敗：" + e.message, "err");
+      if (!isStale()) setStatus(status, "❌ 失敗：" + e.message, "err");
       return;
     }
+    if (isStale()) return;
     document.getElementById("f-ingredients").value = ingredientsText;
     setStatus(status, "✅ 読み取り完了。内容を確認・修正できます。", "ok");
+    // 前の原材料向けの警告は、新しい原材料と食い違うので消しておく（作り直しに失敗しても残さない）
+    currentWarningText = "";
+    showWarningPreview("");
 
     const name = document.getElementById("f-name").value.trim() || "このお菓子";
-    const warnStatus = document.getElementById("warning-status");
     setStatus(warnStatus, "警告メッセージを作成中…", "pending");
     try {
-      currentWarningText = await Gemini.generateWarning(name, ingredientsText);
-      const prev = document.getElementById("warning-preview");
-      prev.textContent = "⚠️ " + currentWarningText;
-      prev.style.display = "block";
+      const warningText = await Gemini.generateWarning(name, ingredientsText);
+      if (isStale()) return;
+      currentWarningText = warningText;
+      showWarningPreview(warningText);
       setStatus(warnStatus, "✅ 警告メッセージを作成しました", "ok");
     } catch (e) {
-      setStatus(warnStatus, "❌ 警告メッセージの生成に失敗：" + e.message, "err");
+      if (!isStale()) setStatus(warnStatus, "❌ 警告メッセージの生成に失敗：" + e.message, "err");
     }
   }
 
@@ -381,8 +386,10 @@ const App = (() => {
 
   async function onSave(ev) {
     ev.preventDefault();
+    if (isSaving) return;
     const name = document.getElementById("f-name").value.trim();
     if (!name) { Util.showBanner("お菓子の名前を入力してください", "error"); return; }
+    if (imageJob && !confirm("原材料の読み取り（警告メッセージの作成）がまだ終わっていません。終わるのを待たずに保存しますか？")) return;
 
     const row = {
       name,
@@ -415,11 +422,16 @@ const App = (() => {
     await load();
   }
 
+  async function deleteWithConfirm(id) {
+    if (!confirm("この記録を削除します。よろしいですか？")) return false;
+    const { error } = await DB.deleteRecord(id);
+    if (error) { Util.showBanner("削除に失敗：" + error.message, "error"); return false; }
+    return true;
+  }
+
   async function onDelete() {
     if (!editingId) return;
-    if (!confirm("この記録を削除します。よろしいですか？")) return;
-    const { error } = await DB.deleteRecord(editingId);
-    if (error) { Util.showBanner("削除に失敗：" + error.message, "error"); return; }
+    if (!(await deleteWithConfirm(editingId))) return;
     Util.showView("view-list");
     await load();
   }
