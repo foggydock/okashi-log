@@ -17,6 +17,7 @@ const App = (() => {
     document.getElementById("btn-new").addEventListener("click", () => leaveFormIfNeeded(openForm));
     document.getElementById("btn-cancel").addEventListener("click", () => leaveFormIfNeeded(() => Util.showView("view-list")));
     document.getElementById("btn-calendar").addEventListener("click", () => leaveFormIfNeeded(openCalendar));
+    document.getElementById("btn-refresh").addEventListener("click", refresh);
     document.getElementById("btn-cal-close").addEventListener("click", () => Util.showView("view-list"));
     document.getElementById("cal-prev").addEventListener("click", () => shiftCalMonth(-1));
     document.getElementById("cal-next").addEventListener("click", () => shiftCalMonth(1));
@@ -69,6 +70,17 @@ const App = (() => {
     if (list) records = list;
     renderPastSnackChoices();
     render();
+  }
+
+  // 一覧画面の🔄ボタン：読み込み中は連打できないようにし、失敗時の再試行にも使う
+  async function refresh() {
+    const btn = document.getElementById("btn-refresh");
+    btn.disabled = true;
+    try {
+      await load();
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   // 同じ名前の記録をまとめ、直近に使ったお菓子名を入力候補として出す。
@@ -188,7 +200,7 @@ const App = (() => {
     if (records.length === 0) {
       wrap.innerHTML = "";
       empty.textContent = loadFailed
-        ? "記録を読み込めませんでした。通信状況を確認して、ページを再読み込みしてください。"
+        ? "記録を読み込めませんでした。通信状況を確認して、🔄（読み込み直す）を押してください。"
         : "まだ記録がありません。「＋ 記録する」から始めましょう。";
       empty.style.display = "block";
       return;
