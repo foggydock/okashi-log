@@ -96,6 +96,8 @@ body {
 .stop-hint { color: var(--muted); font-size: .82rem; margin: 10px 0 0; }
 
 .section-title { font-size: 1rem; color: var(--muted); margin: 0 0 10px; }
+.list-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.list-header .section-title { margin-bottom: 0; }
 
 /* ---- record list ---- */
 .record-list { display: flex; flex-direction: column; gap: 10px; }
