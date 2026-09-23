@@ -24,6 +24,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+# 止めた直後に再起動しても「ポート使用中」にならないようにする
+socketserver.TCPServer.allow_reuse_address = True
+
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
     print(f"http://localhost:{PORT}/  (Ctrl+C で停止)")
     try:

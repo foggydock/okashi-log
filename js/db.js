@@ -19,7 +19,7 @@ const DB = (() => {
 
   function getClient() { return client; }
 
-  // 全件取得（1000件上限を超えてもページネーションで全部取る）
+  // 全件取得（1000件上限を超えてもページネーションで全部取る）。失敗したら null（0件と区別する）
   async function listRecords() {
     if (!client) return [];
     let all = [];
@@ -33,7 +33,7 @@ const DB = (() => {
         .range(from, from + step - 1);
       if (error) {
         Util.showBanner(`読み込みエラー: ${error.message}`, "error");
-        return all;
+        return null;
       }
       if (!data || data.length === 0) break;
       all = all.concat(data);

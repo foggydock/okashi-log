@@ -29,6 +29,16 @@ const Util = (() => {
 
   function nl2br(s) { return esc(s).replace(/\n/g, "<br>"); }
 
+  const p2 = (n) => String(n).padStart(2, "0");
+
+  // ISO日時 または Date -> "YYYY-MM-DD"（端末の時刻で。カレンダーの日付キーにも使う）
+  function fmtDate(v) {
+    if (!v) return "";
+    const d = new Date(v);
+    if (isNaN(d)) return "";
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  }
+
   // ISO日時 -> "今日 / 昨日 / N日前 / YYYY-MM-DD"（ざっくり表示用）
   function relDay(iso) {
     if (!iso) return "";
@@ -39,21 +49,14 @@ const Util = (() => {
     if (days <= 0) return "今日";
     if (days === 1) return "昨日";
     if (days < 30) return `${days}日前`;
-    const p = (n) => String(n).padStart(2, "0");
-    return `${then.getFullYear()}-${p(then.getMonth() + 1)}-${p(then.getDate())}`;
+    return fmtDate(then);
   }
 
   function fmtDateTime(iso) {
     if (!iso) return "";
     const d = new Date(iso);
     if (isNaN(d)) return "";
-    const p = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-  }
-
-  function debounce(fn, ms = 200) {
-    let t = null;
-    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+    return `${fmtDate(d)} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
   }
 
   function lsGet(key, fallback = "") {
@@ -63,6 +66,6 @@ const Util = (() => {
     try { localStorage.setItem(key, value); } catch (_) {}
   }
 
-  return { showView, showBanner, esc, nl2br, relDay, fmtDateTime, debounce, lsGet, lsSet };
+  return { showView, showBanner, esc, nl2br, fmtDate, relDay, fmtDateTime, lsGet, lsSet };
 })();
 window.Util = Util;
