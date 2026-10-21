@@ -139,7 +139,7 @@ body {
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: .85rem; color: var(--muted); }
 .req { color: var(--danger); font-size: .75rem; }
-.field input[type="text"], .field textarea {
+.field input[type="text"], .field input[type="datetime-local"], .field textarea {
   font-family: inherit; font-size: 1rem; padding: 10px 12px;
   border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
 }

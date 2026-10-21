@@ -297,6 +297,7 @@ const App = (() => {
     imageJob = null;
     document.getElementById("record-form").reset();
     document.getElementById("f-name").value = r?.name || "";
+    document.getElementById("f-eaten-at").value = toLocalInput(r ? new Date(r.eaten_at) : new Date());
     document.getElementById("f-ingredients").value = r?.ingredients_text || "";
 
     document.querySelectorAll("#amount-input span").forEach((s) => {
@@ -314,6 +315,12 @@ const App = (() => {
     Util.showView("view-form");
   }
 
+  // Date -> datetime-local 用の "YYYY-MM-DDTHH:mm"（端末の時刻）
+  function toLocalInput(d) {
+    const p2 = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  }
+
   function showWarningPreview(text) {
     const prev = document.getElementById("warning-preview");
     prev.textContent = text ? "⚠️ " + text : "";
@@ -324,6 +331,7 @@ const App = (() => {
     return JSON.stringify({
       name: document.getElementById("f-name").value.trim(),
       amount: selectedAmount,
+      eatenAt: document.getElementById("f-eaten-at").value,
       ingredients: document.getElementById("f-ingredients").value.trim(),
       warning: currentWarningText,
     });
@@ -403,8 +411,13 @@ const App = (() => {
     if (!name) { Util.showBanner("お菓子の名前を入力してください", "error"); return; }
     if (imageJob && !confirm("原材料の読み取り（警告メッセージの作成）がまだ終わっていません。終わるのを待たずに保存しますか？")) return;
 
+    const eatenAtValue = document.getElementById("f-eaten-at").value;
+    const eatenAt = new Date(eatenAtValue);
+    if (!eatenAtValue || isNaN(eatenAt)) { Util.showBanner("食べた日時を入力してください", "error"); return; }
+
     const row = {
       name,
+      eaten_at: eatenAt.toISOString(),
       amount: selectedAmount,
       ingredients_text: document.getElementById("f-ingredients").value.trim(),
       warning_text: currentWarningText,
