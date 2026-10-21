@@ -143,9 +143,29 @@ const App = (() => {
     suggestions.style.display = "block";
   }
 
+  // 新規記録で、過去に同じ名前の記録があり原材料がまだ空なら、過去の原材料と警告を引き継ぐ。
+  // 同じ名前では1回だけ（消したあとに勝手に戻さない）。
+  let autoFilledKey = "";
+  function applyPastIngredients() {
+    if (editingId) return;
+    const name = document.getElementById("f-name").value;
+    const key = normalizeSnackName(name);
+    if (!key || key === autoFilledKey) return;
+    const ingEl = document.getElementById("f-ingredients");
+    if (ingEl.value.trim() || currentWarningText || imageJob) return;
+    const past = pastRecordsFor(name).find((r) => r.ingredients_text);
+    if (!past) return;
+    autoFilledKey = key;
+    ingEl.value = past.ingredients_text;
+    currentWarningText = past.warning_text || "";
+    showWarningPreview(currentWarningText);
+    setStatus(document.getElementById("ingredients-status"), "📋 過去の記録から原材料を引き継ぎました（手直しできます）", "ok");
+  }
+
   function onSnackNameInput() {
     renderPastSnackChoices(document.getElementById("f-name").value);
     updatePastRecordPreview();
+    applyPastIngredients();
   }
 
   function updatePastRecordPreview() {
@@ -295,6 +315,7 @@ const App = (() => {
     selectedAmount = r?.amount || "";
     currentWarningText = r?.warning_text || "";
     imageJob = null;
+    autoFilledKey = "";
     document.getElementById("record-form").reset();
     document.getElementById("f-name").value = r?.name || "";
     document.getElementById("f-eaten-at").value = toLocalInput(r ? new Date(r.eaten_at) : new Date());
