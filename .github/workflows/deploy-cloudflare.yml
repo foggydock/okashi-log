@@ -21,7 +21,8 @@ jobs:
       - name: 配信するファイルだけを集める
         run: |
           mkdir _site
-          rsync -a --exclude='.git' --exclude='.github' --exclude='.claude' --exclude='CLAUDE.md' --exclude='_site' ./ _site/
+          rsync -a --exclude='.git' --exclude='.github' --exclude='.claude' --exclude='CLAUDE.md' --exclude='_site' \
+            --exclude='/functions' --exclude='/sql' --exclude='/serve.py' --exclude='/.gitignore' --exclude='/js/config.example.js' ./ _site/
       - uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
