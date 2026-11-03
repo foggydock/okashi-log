@@ -46,7 +46,8 @@ const Util = (() => {
     if (isNaN(then)) return "";
     const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const days = Math.round((startOfDay(new Date()) - startOfDay(then)) / 86400000);
-    if (days <= 0) return "今日";
+    if (days < 0) return fmtDate(then); // 未来の日時（入力ミスなど）は「今日」とせず日付で見せる
+    if (days === 0) return "今日";
     if (days === 1) return "昨日";
     if (days < 30) return `${days}日前`;
     return fmtDate(then);
@@ -59,6 +60,11 @@ const Util = (() => {
     return `${fmtDate(d)} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
   }
 
+  // ISO日時 または Date -> 日時入力欄（datetime-local）用の "YYYY-MM-DDTHH:mm"（端末の時刻で）
+  function fmtLocalInput(v) {
+    return fmtDateTime(v).replace(" ", "T");
+  }
+
   function lsGet(key, fallback = "") {
     try { const v = localStorage.getItem(key); return v == null ? fallback : v; } catch (_) { return fallback; }
   }
@@ -66,6 +72,6 @@ const Util = (() => {
     try { localStorage.setItem(key, value); } catch (_) {}
   }
 
-  return { showView, showBanner, esc, nl2br, fmtDate, relDay, fmtDateTime, lsGet, lsSet };
+  return { showView, showBanner, esc, nl2br, fmtDate, relDay, fmtDateTime, fmtLocalInput, lsGet, lsSet };
 })();
 window.Util = Util;

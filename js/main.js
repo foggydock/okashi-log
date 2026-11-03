@@ -28,8 +28,9 @@ function showLogin() {
 
 async function startApp() {
   document.getElementById("app-header").style.display = "flex";
-  await App.load();
+  // 読み込みを待つ間もログイン画面を見せない（一覧に「読み込み中…」を出す）
   Util.showView("view-list");
+  await App.load();
   // 起動時：記録済みの中からランダムに1件、警告メッセージを自動表示
   App.showRandomWarning(false);
 }

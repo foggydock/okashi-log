@@ -1,8 +1,8 @@
 // アプリの外枠（HTML/CSS/JS等の静的ファイル）だけをキャッシュする最小限のService Worker。
 // 記録データ（Supabase）はキャッシュしないため、オフライン時は起動は速くなるが一覧の中身は出ない。
 // JS/CSSを変えたら、この版と index.html の ?v= を両方上げる
-const CACHE_NAME = "okashi-shell-v14";
-// 同じドメイン（foggydock.github.io）の他のアプリとキャッシュの置き場が共通なので、消すのはこの接頭辞の古い版だけにする
+const CACHE_NAME = "okashi-shell-v15";
+// 同じドメインに他のアプリのキャッシュがあっても消さないよう（以前の GitHub Pages では foggydock.github.io を共用していた）、消すのはこの接頭辞の古い版だけにする
 const CACHE_PREFIX = "okashi-shell-";
 // index.html は入れない（Cloudflare Pages では "/" へ転送され、転送済みの応答を画面遷移に返すと開けなくなる）
 const SHELL_FILES = [
@@ -43,7 +43,7 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return; // 別オリジン（Supabase/Gemini等）は素通し
 
   if (req.mode === "navigate") {
-    // GitHub PagesはCache-Control: max-age=600を返すため、no-storeでブラウザの標準HTTPキャッシュを迂回する
+    // ブラウザの標準HTTPキャッシュに残った古いHTMLを使わないよう、no-storeで毎回取りに行く
     e.respondWith(
       fetch(req, { cache: "no-store" }).catch(() => caches.match("./"))
     );

@@ -9,6 +9,7 @@ const App = (() => {
   let calDate = new Date();
   let calSelectedKey = null;
   let formInitialState = null;
+  let eatenAtInitial = ""; // フォームを開いたときの「食べた日時」欄の値
   let isSaving = false;
   // 読み取り中の画像処理。フォームを開き直したら捨てて、遅れて届いた結果を別の記録に入れない
   let imageJob = null;
@@ -22,6 +23,7 @@ const App = (() => {
     document.getElementById("cal-prev").addEventListener("click", () => shiftCalMonth(-1));
     document.getElementById("cal-next").addEventListener("click", () => shiftCalMonth(1));
     document.getElementById("btn-logout").addEventListener("click", async () => {
+      if (blockWhileSaving()) return;
       if (isFormDirty() && !confirm("入力した内容は保存されていません。破棄してログアウトしますか？")) return;
       // 破棄を選んだので、ログアウト後の再読み込みで「このサイトを離れますか？」をもう一度出さない
       formInitialState = null;
@@ -63,6 +65,7 @@ const App = (() => {
 
   async function load() {
     const seq = ++loadSeq;
+    if (!records.length) showListMessage("記録を読み込み中…");
     const list = await DB.listRecords();
     if (seq !== loadSeq) return; // 後から始めた読み込みを優先し、古い結果で上書きしない
     // 読み込みに失敗したら手元の一覧は残す（通信エラーで「まだ記録がありません」と見せない）
@@ -145,20 +148,28 @@ const App = (() => {
 
   // 新規記録で、過去に同じ名前の記録があり原材料がまだ空なら、過去の原材料と警告を引き継ぐ。
   // 同じ名前では1回だけ（消したあとに勝手に戻さない）。
-  let autoFilledKey = "";
+  // 引き継いだまま手を付けずに名前を別のお菓子に変えたら取り消す（前のお菓子の原材料と警告で保存しない）
+  let autoFilled = null; // { key, ingredients, warning }
   function applyPastIngredients() {
     if (editingId) return;
     const name = document.getElementById("f-name").value;
     const key = normalizeSnackName(name);
-    if (!key || key === autoFilledKey) return;
     const ingEl = document.getElementById("f-ingredients");
+    if (autoFilled && autoFilled.key !== key &&
+        ingEl.value === autoFilled.ingredients && currentWarningText === autoFilled.warning) {
+      autoFilled = null;
+      ingEl.value = "";
+      setWarning("");
+      // 画像の読み取り中は「読み取り中…」を消さない
+      if (!imageJob) setStatus(document.getElementById("ingredients-status"), "", null);
+    }
+    if (!key || key === autoFilled?.key) return;
     if (ingEl.value.trim() || currentWarningText || imageJob) return;
     const past = pastRecordsFor(name).find((r) => r.ingredients_text);
     if (!past) return;
-    autoFilledKey = key;
     ingEl.value = past.ingredients_text;
-    currentWarningText = past.warning_text || "";
-    showWarningPreview(currentWarningText);
+    setWarning(past.warning_text || "");
+    autoFilled = { key, ingredients: ingEl.value, warning: currentWarningText };
     setStatus(document.getElementById("ingredients-status"), "📋 過去の記録から原材料を引き継ぎました（手直しできます）", "ok");
   }
 
@@ -214,18 +225,23 @@ const App = (() => {
     });
   }
 
+  // 一覧が空のときの案内（読み込み中・失敗・本当に0件）。空文字で隠す
+  function showListMessage(text) {
+    const empty = document.getElementById("list-empty");
+    empty.textContent = text;
+    empty.style.display = text ? "block" : "none";
+  }
+
   function render() {
     const wrap = document.getElementById("record-list");
-    const empty = document.getElementById("list-empty");
     if (records.length === 0) {
       wrap.innerHTML = "";
-      empty.textContent = loadFailed
+      showListMessage(loadFailed
         ? "記録を読み込めませんでした。通信状況を確認して、🔄（読み込み直す）を押してください。"
-        : "まだ記録がありません。「＋ 記録する」から始めましょう。";
-      empty.style.display = "block";
+        : "まだ記録がありません。「＋ 記録する」から始めましょう。");
       return;
     }
-    empty.style.display = "none";
+    showListMessage("");
     wrap.innerHTML = records.map((r) => recordCardHtml(r, Util.relDay(r.eaten_at), true)).join("");
     bindRecordCards(wrap);
 
@@ -313,12 +329,13 @@ const App = (() => {
   function openForm(r = null) {
     editingId = r ? r.id : null;
     selectedAmount = r?.amount || "";
-    currentWarningText = r?.warning_text || "";
     imageJob = null;
-    autoFilledKey = "";
+    autoFilled = null;
     document.getElementById("record-form").reset();
     document.getElementById("f-name").value = r?.name || "";
-    document.getElementById("f-eaten-at").value = toLocalInput(r ? new Date(r.eaten_at) : new Date());
+    const eatenAtEl = document.getElementById("f-eaten-at");
+    eatenAtEl.value = Util.fmtLocalInput(r ? r.eaten_at : new Date());
+    eatenAtInitial = eatenAtEl.value;
     document.getElementById("f-ingredients").value = r?.ingredients_text || "";
 
     document.querySelectorAll("#amount-input span").forEach((s) => {
@@ -328,7 +345,7 @@ const App = (() => {
     document.getElementById("btn-delete").style.display = r ? "inline-flex" : "none";
     setStatus(document.getElementById("ingredients-status"), "", null);
     setStatus(document.getElementById("warning-status"), "", null);
-    showWarningPreview(currentWarningText);
+    setWarning(r?.warning_text || "");
     document.querySelector(".form-title").textContent = r ? "お菓子の記録を編集" : "お菓子を記録する";
     // 前回入力した名前で絞り込まれた候補が残らないよう、今の名前で描き直す
     onSnackNameInput();
@@ -336,13 +353,9 @@ const App = (() => {
     Util.showView("view-form");
   }
 
-  // Date -> datetime-local 用の "YYYY-MM-DDTHH:mm"（端末の時刻）
-  function toLocalInput(d) {
-    const p2 = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
-  }
-
-  function showWarningPreview(text) {
+  // 保存する警告メッセージと、その表示をまとめて切り替える
+  function setWarning(text) {
+    currentWarningText = text;
     const prev = document.getElementById("warning-preview");
     prev.textContent = text ? "⚠️ " + text : "";
     prev.style.display = text ? "block" : "none";
@@ -367,7 +380,14 @@ const App = (() => {
       formInitialState !== null && currentFormState() !== formInitialState;
   }
 
+  // 保存中は画面を移らない（保存が終わると一覧へ切り替わり、移動先で書き始めた内容が消えてしまう）
+  function blockWhileSaving() {
+    if (isSaving) Util.showBanner("保存中です。少しお待ちください", "info");
+    return isSaving;
+  }
+
   function leaveFormIfNeeded(next) {
+    if (blockWhileSaving()) return;
     if (isFormDirty() && !confirm("入力した内容は保存されていません。破棄して移動しますか？")) return;
     next();
   }
@@ -403,16 +423,14 @@ const App = (() => {
     document.getElementById("f-ingredients").value = ingredientsText;
     setStatus(status, "✅ 読み取り完了。内容を確認・修正できます。", "ok");
     // 前の原材料向けの警告は、新しい原材料と食い違うので消しておく（作り直しに失敗しても残さない）
-    currentWarningText = "";
-    showWarningPreview("");
+    setWarning("");
 
     const name = document.getElementById("f-name").value.trim() || "このお菓子";
     setStatus(warnStatus, "警告メッセージを作成中…", "pending");
     try {
       const warningText = await Gemini.generateWarning(name, ingredientsText);
       if (isStale()) return;
-      currentWarningText = warningText;
-      showWarningPreview(warningText);
+      setWarning(warningText);
       setStatus(warnStatus, "✅ 警告メッセージを作成しました", "ok");
     } catch (e) {
       if (!isStale()) setStatus(warnStatus, "❌ 警告メッセージの生成に失敗：" + e.message, "err");
@@ -438,11 +456,12 @@ const App = (() => {
 
     const row = {
       name,
-      eaten_at: eatenAt.toISOString(),
       amount: selectedAmount,
       ingredients_text: document.getElementById("f-ingredients").value.trim(),
       warning_text: currentWarningText,
     };
+    // 入力欄は分単位。編集で日時を触っていなければ送らず、元の日時（秒以下まで）をそのまま残す
+    if (!editingId || eatenAtValue !== eatenAtInitial) row.eaten_at = eatenAt.toISOString();
 
     const btn = document.getElementById("btn-save");
     btn.disabled = true; btn.textContent = "保存中…";
@@ -476,7 +495,7 @@ const App = (() => {
   }
 
   async function onDelete() {
-    if (!editingId) return;
+    if (!editingId || blockWhileSaving()) return;
     if (!(await deleteWithConfirm(editingId))) return;
     Util.showView("view-list");
     await load();

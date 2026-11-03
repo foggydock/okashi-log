@@ -53,10 +53,11 @@ const Gemini = (() => {
     if (imagePart) parts.push(imagePart);
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(key)}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // キーはURLに載せずヘッダーで送る（URLは閲覧履歴や通信の記録に残りやすいため）
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: { temperature: 0.4 },

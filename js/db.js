@@ -20,6 +20,7 @@ const DB = (() => {
   function getClient() { return client; }
 
   // 全件取得（1000件上限を超えてもページネーションで全部取る）。失敗したら null（0件と区別する）
+  // 食べた日時が同じ記録（入力欄は分単位）も毎回同じ順に並べ、ページの境目で重複・欠落させない
   async function listRecords() {
     if (!client) return [];
     let all = [];
@@ -30,6 +31,8 @@ const DB = (() => {
         .from("snack_records")
         .select("*")
         .order("eaten_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .range(from, from + step - 1);
       if (error) {
         Util.showBanner(`読み込みエラー: ${error.message}`, "error");
